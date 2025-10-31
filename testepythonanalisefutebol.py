@@ -5,9 +5,8 @@ import datetime
 import base64
 from streamlit_autorefresh import st_autorefresh
 
-# 🔐 Carrega chave da API do Streamlit Secrets
+# 🔐 Chave da API via Streamlit Secrets
 API_KEY = st.secrets["RAPIDAPI_KEY"]
-
 HEADERS = {
     "X-RapidAPI-Key": API_KEY,
     "X-RapidAPI-Host": "free-api-live-football-data.p.rapidapi.com"
@@ -16,7 +15,7 @@ HEADERS = {
 # 🔁 Configuração da página
 st.set_page_config(page_title="Painel Futebol", layout="wide")
 st.title("⚽ Painel de Análise de Partidas de Futebol")
-st.markdown("Atualiza automaticamente a cada X minutos e identifica padrões estatísticos em partidas reais.")
+st.markdown("Atualiza automaticamente e identifica padrões estatísticos em partidas reais.")
 
 # ⚙️ Configurações do usuário
 intervalo = st.sidebar.slider("⏱ Intervalo de atualização (min)", 1, 30, 5)
@@ -27,19 +26,41 @@ exigir_dominio_b = st.sidebar.checkbox("✅ Exigir que Time B domine Finalizaç�
 # 🔄 Atualização automática
 st_autorefresh(interval=intervalo * 60 * 1000, key="datarefresh")
 
-# 🌐 Coleta de dados via API
-def coletar_dados():
+# 🌐 Coleta de partidas ao vivo
+def buscar_eventos_ao_vivo():
     url = "https://free-api-live-football-data.p.rapidapi.com/live"
     try:
         response = requests.get(url, headers=HEADERS, timeout=10)
         data = response.json()
-        partidas = []
+        return data.get("data", [])
+    except Exception:
+        st.warning("⚠️ Não foi possível carregar os eventos ao vivo.")
+        return []
 
-        for jogo in data.get("data", []):
-            stats = jogo.get("stats", {})
+# 📊 Coleta estatísticas por event_id
+def buscar_estatisticas(event_id):
+    url = f"https://free-api-live-football-data.p.rapidapi.com/eventstats/{event_id}"
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        return response.json().get("data", {})
+    except Exception:
+        return {}
+
+# 🧠 Processa partidas com estatísticas
+def coletar_dados_completos():
+    eventos = buscar_eventos_ao_vivo()
+    partidas = []
+
+    for evento in eventos:
+        event_id = evento.get("event_id")
+        home = evento.get("home_team", {}).get("name", "")
+        away = evento.get("away_team", {}).get("name", "")
+        stats = buscar_estatisticas(event_id)
+
+        if stats:
             partidas.append({
-                "Time A": jogo.get("home_team", {}).get("name", ""),
-                "Time B": jogo.get("away_team", {}).get("name", ""),
+                "Time A": home,
+                "Time B": away,
                 "Ataques A": stats.get("attacks_home", 0),
                 "Ataques B": stats.get("attacks_away", 0),
                 "Ataques perigosos A": stats.get("dangerous_attacks_home", 0),
@@ -51,12 +72,10 @@ def coletar_dados():
                 "Chutes a gol A": stats.get("shots_on_goal_home", 0),
                 "Chutes a gol B": stats.get("shots_on_goal_away", 0),
             })
-        return pd.DataFrame(partidas)
-    except Exception:
-        st.warning("⚠️ Não foi possível carregar os dados da API.")
-        return pd.DataFrame()
 
-# 📊 Lógica de seleção
+    return pd.DataFrame(partidas)
+
+# 🔍 Aplica lógica de seleção
 def aplicar_logica(df):
     def verifica_padrao(row):
         dominio_a = (
@@ -76,8 +95,8 @@ def aplicar_logica(df):
     df["Padrão ✅"] = df.apply(verifica_padrao, axis=1)
     return df
 
-# 📥 Coleta e análise
-df = coletar_dados()
+# 📥 Executa coleta e análise
+df = coletar_dados_completos()
 if not df.empty:
     df = aplicar_logica(df)
     st.dataframe(df, use_container_width=True)
@@ -96,4 +115,4 @@ if not df.empty:
     href = f'<a href="data:text/html;base64,{b64}" download="relatorio_futebol.html">📥 Baixar Relatório HTML</a>'
     st.markdown(href, unsafe_allow_html=True)
 else:
-    st.info("Nenhuma partida disponível no momento.")
+    st.info("Nenhuma partida com estatísticas disponíveis no momento.")

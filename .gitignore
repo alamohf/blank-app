@@ -156,7 +156,6 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-RAPIDAPI_KEY=2461177cd3msh8edb487aa42957ap15a996jsn91abf2028748
 
 
 # PyCharm

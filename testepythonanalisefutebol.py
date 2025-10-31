@@ -17,7 +17,10 @@ delta_posse = st.sidebar.number_input("🔺 Delta mínimo de Posse (%)", value=5
 exigir_dominio_b = st.sidebar.checkbox("✅ Exigir que Time B domine Finalizações e Chutes")
 
 # 🔄 Atualização automática
-st_autorefresh = st.experimental_rerun if st.session_state.get("last_refresh", 0) + intervalo * 60 < datetime.datetime.now().timestamp() else None
+from streamlit_autorefresh import st_autorefresh
+
+# ⏱ Atualização automática a cada X minutos
+st_autorefresh(interval=intervalo * 60 * 1000, key="datarefresh")
 st.session_state["last_refresh"] = datetime.datetime.now().timestamp()
 
 # 🌐 Fonte de dados
